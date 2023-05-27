@@ -3636,6 +3636,11 @@ bool EQMod::saveConfigItems(FILE *fp)
     if (horizon)
         horizon->saveConfigItems(fp);
 #endif
+#if defined WITH_ALIGN || defined WITH_ALIGN_GEEHALEL
+    if (AlignSyncModeSP)
+        AlignSyncModeSP->saveConfigItems(fp);
+#endif
+    
     return true;
 }
 
