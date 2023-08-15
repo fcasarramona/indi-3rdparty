@@ -1018,6 +1018,7 @@ IPState MaxDomeII::UnPark()
     int error;
     int nRetry = 3;
 
+    SetParked(false); // In order to allow Dome operation in the unpark procedure
     while (nRetry)
     {
         error = driver.HomeAzimuth();
