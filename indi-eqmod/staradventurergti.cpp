@@ -18,7 +18,7 @@
 
 */
 
-#include "skyadventurergtibase.h"
+#include "staradventurergtibase.h"
 #include <memory>
 
-static std::unique_ptr<SkyAdventurerGTIBase> azgti(new SkyAdventurerGTIBase());
+static std::unique_ptr<StarAdventurerGTIBase> azgti(new StarAdventurerGTIBase());

@@ -106,9 +106,8 @@ bool ToupBase::initProperties()
         IUFillSwitchVector(&m_CoolerSP, m_CoolerS, 2, getDeviceName(), "CCD_COOLER", "Cooler", MAIN_CONTROL_TAB, IP_WO, ISR_1OFMANY,
                            0, IPS_BUSY);
 
-        IUFillText(&m_CoolerT, "COOLER_POWER", "Percent", nullptr);
-        IUFillTextVector(&m_CoolerTP, &m_CoolerT, 1, getDeviceName(), "COOLER_POWER", "Cooler Power", MAIN_CONTROL_TAB, IP_RO, 0,
-                         IPS_IDLE);
+        m_CoolerNP[0].fill("COOLER_POWER", "Percent", "%.f", 0, 100, 10, 0);
+        m_CoolerNP.fill(getDeviceName(), "CCD_COOLER_POWER", "Cooler Power", MAIN_CONTROL_TAB, IP_RO, 0, IPS_IDLE);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////
@@ -329,7 +328,7 @@ bool ToupBase::updateProperties()
         if (HasCooler())
         {
             defineProperty(&m_CoolerSP);
-            defineProperty(&m_CoolerTP);
+            defineProperty(m_CoolerNP);
         }
 
         // Even if there is no cooler, we define temperature property as READ ONLY
@@ -381,7 +380,7 @@ bool ToupBase::updateProperties()
         if (HasCooler())
         {
             deleteProperty(m_CoolerSP.name);
-            deleteProperty(m_CoolerTP.name);
+            deleteProperty(m_CoolerNP);
         }
         else
         {
@@ -1267,9 +1266,10 @@ bool ToupBase::StopStreaming()
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 int ToupBase::SetTemperature(double temperature)
 {
-    if (activateCooler(true) == false)
+    // JM 2023.11.21: Only activate cooler if the requested temperature is below current temperature
+    if (temperature < TemperatureN[0].value && activateCooler(true) == false)
     {
-        LOG_ERROR("Failed to activate cooler");
+        LOG_ERROR("Failed to toggle cooler.");
         return -1;
     }
 
@@ -1289,7 +1289,17 @@ int ToupBase::SetTemperature(double temperature)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 bool ToupBase::activateCooler(bool enable)
 {
-    HRESULT rc = FP(put_Option(m_Handle, CP(OPTION_TEC), enable ? 1 : 0));
+    int val = 0;
+    auto isCoolerOn = false;
+    HRESULT rc = FP(get_Option(m_Handle, CP(OPTION_TEC), &val));
+    if (SUCCEEDED(rc))
+        isCoolerOn = (val != 0);
+
+    // If no state change, return.
+    if ( (enable && isCoolerOn) || (!enable && !isCoolerOn))
+        return true;
+
+    rc = FP(put_Option(m_Handle, CP(OPTION_TEC), enable ? 1 : 0));
     IUResetSwitch(&m_CoolerSP);
     if (FAILED(rc))
     {
@@ -1302,7 +1312,7 @@ bool ToupBase::activateCooler(bool enable)
     else
     {
         m_CoolerS[enable ? INDI_ENABLED : INDI_DISABLED].s = ISS_ON;
-        m_CoolerSP.s = IPS_OK;
+        m_CoolerSP.s = enable ? IPS_BUSY : IPS_IDLE;
         IDSetSwitch(&m_CoolerSP, nullptr);
 
         /* turn on TEC may force to turn on the fan */
@@ -1512,23 +1522,23 @@ void ToupBase::TimerHit()
         int val = 0;
         HRESULT rc = FP(get_Option(m_Handle, CP(OPTION_TEC), &val));
         if (FAILED(rc))
-            m_CoolerTP.s = IPS_ALERT;
+            m_CoolerNP.setState(IPS_ALERT);
         else if (0 == val)
         {
-            IUSaveText(&m_CoolerT, "0.0% (OFF)");
-            IDSetText(&m_CoolerTP, nullptr);
+            m_CoolerNP.setState(IPS_IDLE);
+            m_CoolerNP[0].setValue(0);
+            m_CoolerNP.apply();
         }
         else
         {
             rc = FP(get_Option(m_Handle, CP(OPTION_TEC_VOLTAGE), &val));
             if (FAILED(rc))
-                m_CoolerTP.s = IPS_ALERT;
+                m_CoolerNP.setState(IPS_ALERT);
             else if (val <= m_maxTecVoltage)
             {
-                char str[32];
-                sprintf(str, "%.1f%%", val * 100.0 / m_maxTecVoltage);
-                IUSaveText(&m_CoolerT, str);
-                IDSetText(&m_CoolerTP, nullptr);
+                m_CoolerNP[0].setValue(val * 100.0 / m_maxTecVoltage);
+                m_CoolerNP.setState(IPS_BUSY);
+                m_CoolerNP.apply();
             }
         }
     }

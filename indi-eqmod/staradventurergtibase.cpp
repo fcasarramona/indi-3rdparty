@@ -1,5 +1,5 @@
 /*******************************************************************************
-  Copyright(c) 2022 Jasem Mutlaq. All rights reserved.
+  Copyright(c) 2020 Jasem Mutlaq. All rights reserved.
 
  This library is free software; you can redistribute it and/or
  modify it under the terms of the GNU Library General Public
@@ -16,16 +16,26 @@
  Boston, MA 02110-1301, USA.
 *******************************************************************************/
 
-#pragma once
+#include "staradventurergtibase.h"
+#include <connectionplugins/connectionserial.h>
 
-#include "eqmodbase.h"
-
-class SkyAdventurerGTIBase : public EQMod
+StarAdventurerGTIBase::StarAdventurerGTIBase() : EQMod()
 {
-    public:
-        SkyAdventurerGTIBase();
-    protected:
-        virtual const char *getDefaultName();
-        virtual bool initProperties();
-};
+}
 
+const char * StarAdventurerGTIBase::getDefaultName()
+{
+    return "Star Adventurer GTi";
+}
+
+bool StarAdventurerGTIBase::initProperties()
+{
+    EQMod::initProperties();
+    serialConnection->setDefaultBaudRate(Connection::Serial::B_115200);
+    for (auto oneProperty : *getProperties())
+    {
+        oneProperty.setDeviceName(getDeviceName());
+    }
+
+    return true;
+}
